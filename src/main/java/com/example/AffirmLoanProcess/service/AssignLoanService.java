@@ -24,17 +24,18 @@ public class AssignLoanService {
     public static final String ASSIGNMENT = "Assignment";
     public static final String YIELD = "Yield";
 
-
     List<Banks> banksList;
     List<Covenants> covenantsList;
     List<Facilities> facilitiesList;
     List<Loans> loansList;
-
     List<Assignment> assignmentList ;
     List<Yields> yieldsList ;
 
-    public void initializeData() {
 
+    /***
+     * Data initialization and starter Method called
+     */
+    public void initializeData() {
         assignmentList = new ArrayList<>();
         yieldsList = new ArrayList<>();
 
@@ -46,61 +47,69 @@ public class AssignLoanService {
 
     }
 
+    /***
+     * Process Loans and generates CSV files
+     */
     public void processLoan(){
         for (Loans loan : loansList) {
             facilityApproved(loan);
         }
         generateCSV(YIELD);
         generateCSV(ASSIGNMENT);
-
     }
 
-
-    public void facilityApproved(Loans loan){
-
+    /***
+     * Check for the available facilitie and verifies the loanApproval
+     * @param loan loan verification check
+     */
+    public void facilityApproved(Loans loan) {
         for (Facilities facilitie : facilitiesList) {
-            if(facilitie.getAmount() >= loan.getAmount()){
-                if(loanPassed(loan,facilitie.getBankId())){
-                    facilitie.setAmount(facilitie.getAmount() -loan.getAmount());
+            if (facilitie.getAmount() >= loan.getAmount()) {
+                if (loanPassed(loan, facilitie.getBankId())) {
+                    facilitie.setAmount(facilitie.getAmount() - loan.getAmount());
                     Assignment assignment = new Assignment();
                     assignment.setLoanId(loan.getId());
                     assignment.setFacilityId(facilitie.getFacilityId());
                     assignmentList.add(assignment);
-                    calculateYields(loan,facilitie);
+                    calculateYields(loan, facilitie);
                     break;
                 }
             }
         }
     }
 
-
-    public void calculateYields(Loans loan, Facilities facilitie){
-
+    /***
+     * Calculating Loan Yields based on the loan and facilitie interest rate and amount.
+     * @param loan
+     * @param facilitie
+     */
+    public void calculateYields(Loans loan, Facilities facilitie) {
         int expected_yield;
-
         expected_yield = (int) ((1 - loan.getDefaultLikelihood())
                 * loan.getInterestRate() * loan.getAmount()
                 - loan.getDefaultLikelihood() * loan.getAmount()
                 - facilitie.getInterestRate() * loan.getAmount());
 
         for (Yields yield : yieldsList) {
-            if(yield.getFacilityId() == facilitie.getFacilityId()){
-                yield.setExpectedYield((int) (yield.getExpectedYield()+expected_yield));
+            if (yield.getFacilityId() == facilitie.getFacilityId()) {
+                yield.setExpectedYield((int) (yield.getExpectedYield() + expected_yield));
                 return;
             }
         }
-
         Yields yield = new Yields();
         yield.setFacilityId(facilitie.getFacilityId());
         yield.setExpectedYield(expected_yield);
-
-
         yieldsList.add(yield);
     }
 
 
+    /***
+     * loanApproval based on the constraints provided
+     * @param loan given loan
+     * @param bankId Facilitie bank ID
+     * @return
+     */
     public boolean loanPassed(Loans loan,int bankId){
-
         Predicate<Covenants> pFilter = covenant -> covenant.getMaxDefaultLikelihood() >= loan.getDefaultLikelihood()
                                                     && !covenant.getBannedState().equalsIgnoreCase(loan.getState())
                                                     && covenant.getBankId() == bankId ;
@@ -110,8 +119,11 @@ public class AssignLoanService {
     }
 
 
+    /***
+     * Mapping of CSV to Entity Objects
+     * @throws FileNotFoundException - When the required file is not found throws exception
+     */
     public void csvConvertToObject() throws FileNotFoundException {
-
         banksList = new CsvToBeanBuilder(new FileReader("src/main/resources/filesExcel/banks.csv"))
                 .withType(Banks.class)
                 .build()
@@ -126,7 +138,6 @@ public class AssignLoanService {
                 .withType(Facilities.class)
                 .build()
                 .parse();
-
         facilitiesList.sort(Comparator.comparing(value -> value.getInterestRate()));
 
         loansList = new CsvToBeanBuilder(new FileReader("src/main/resources/filesExcel/loans.csv"))
@@ -136,10 +147,12 @@ public class AssignLoanService {
 
     }
 
-
+    /***
+     * Generates output CSV files Assignment and Yield
+     * @param type - Type of excel
+     */
     public void generateCSV(String type) {
         List<String[]> csvData = null;
-
 
         Path path = Paths.get("src/main/resources/OutputExcelFiles/"+type+".csv");
         try {
@@ -147,28 +160,20 @@ public class AssignLoanService {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        if(type.equalsIgnoreCase(ASSIGNMENT)) csvData = createCsvAssignmentData();
+        if(type.equalsIgnoreCase(YIELD)) csvData = createCsvYieldData();
 
-
-        if(type.equalsIgnoreCase(ASSIGNMENT))
-        {
-            csvData = createCsvAssignmentData();
-        }
-        if(type.equalsIgnoreCase(YIELD))
-        {
-            csvData = createCsvYieldData();
-        }
         try (CSVWriter writer = new CSVWriter(new FileWriter("src/main/resources/OutputExcelFiles/"+type+".csv"))) {
             writer.writeAll(csvData);
-         //   writer.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
-
-
     }
 
-
-
+    /***
+     * Create CSV YieldFile with given data and headers
+     * @return List of string with YieldFile data
+     */
     public List<String[]> createCsvYieldData() {
         String[] yieldHeader = {"facility_id","expected_yield"};
         List<String[]> list = new ArrayList<>();
@@ -182,6 +187,10 @@ public class AssignLoanService {
         return list;
     }
 
+    /***
+     * Create CSV Assignment with given data and headers
+     * @return List of string with AssignmentFile data
+     */
     public List<String[]> createCsvAssignmentData() {
         String[] assignmentHeader = {"loan_id","facility_id"};
         List<String[]> list = new ArrayList<>();
@@ -194,5 +203,4 @@ public class AssignLoanService {
         }
         return list;
     }
-
 }

@@ -15,7 +15,7 @@ public class AssignLoanController {
     AssignLoanService assignLoanService;
 
     @GetMapping
-    public void assignLoan(){
+    public void processLoan(){
         assignLoanService.initializeData();
         assignLoanService.processLoan();
     }
